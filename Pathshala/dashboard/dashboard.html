@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PeerLearn — Dashboard (TutorMatch + Chatbot + Calls + Subscriptions)</title>
+
+<!-- Inline styles for single-file drop-in -->
+<style>
+  :root{
+    --accent:#2e7d32;
+    --muted:#6b7280;
+    --card:#fff;
+    --glass: rgba(255,255,255,0.85);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+  body{background: linear-gradient(180deg,#eef2ff,#ffffff); color:#111; overflow:hidden;}
+  .app {
+    display:flex;
+    height:100vh;
+    gap:20px;
+    padding:20px;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width:250px; min-width:220px;
+    background: linear-gradient(180deg,#0f172a,#0b1221);
+    color:white; border-radius:12px; padding:18px; display:flex; flex-direction:column; gap:12px;
+    box-shadow: 0 8px 30px rgba(2,6,23,0.35);
+  }
+  .brand { font-weight:700; font-size:1.15rem; display:flex;align-items:center;gap:10px}
+  .brand .logo {
+    width:38px;height:38px;border-radius:8px;background:linear-gradient(90deg,#34d399,#10b981); display:inline-block;
+  }
+  .sidebar nav a{ display:block;color:rgba(255,255,255,0.9); text-decoration:none;padding:10px;border-radius:8px;margin-top:6px;transition:all .18s}
+  .sidebar nav a:hover{background: rgba(255,255,255,0.06); transform: translateX(6px)}
+  .sidebar .small{font-size:12px;color:rgba(255,255,255,0.7);margin-top:auto}
+
+  /* Main */
+  .main {
+    flex:1; display:flex; flex-direction:column; gap:18px; overflow:auto; padding:6px;
+  }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 10px; }
+  .welcome { font-size:1.4rem; font-weight:700; }
+  .profile { display:flex; align-items:center; gap:10px; cursor:pointer; position:relative; }
+  .profile img{ width:44px;height:44px;border-radius:8px; object-fit:cover; border:2px solid var(--accent)}
+  .pill { background:var(--glass); padding:8px 12px;border-radius:999px; box-shadow: 0 4px 12px rgba(16,24,40,0.06) }
+
+  /* Layout grid */
+  .grid {
+    display:grid; grid-template-columns: 1fr 360px; gap:18px; align-items:start;
+    margin:0 6px;
+  }
+
+  /* Left column cards */
+  .cards { display:grid; grid-template-columns: repeat(2,1fr); gap:12px }
+  .card {
+    background:var(--card); border-radius:12px; padding:16px; box-shadow: 0 6px 18px rgba(15,23,42,0.06);
+    transition: transform .25s, box-shadow .25s;
+  }
+  .card:hover{ transform: translateY(-6px); box-shadow: 0 14px 36px rgba(15,23,42,0.08); }
+
+  .full { grid-column: 1 / -1; }
+
+  /* progress */
+  .progress { height:10px; background:#f1f5f9; border-radius:999px; overflow:hidden; }
+  .progress > i { display:block; height:100%; background: linear-gradient(90deg,#34d399,#10b981); width:0%; transition: width 1.4s ease; }
+
+  /* Tutor list */
+  .tutor-list { display:flex; flex-direction:column; gap:10px; max-height:380px; overflow:auto; padding-right:6px; }
+  .tutor {
+    display:flex; gap:10px; align-items:center; padding:10px; border-radius:10px; background: #fff;
+  }
+  .tutor .meta { flex:1 }
+  .tutor .name { font-weight:600 }
+  .tutor .sub { color:var(--muted); font-size:13px }
+  .tutor .rating { color:#f59e0b; font-weight:700 }
+
+  /* Right column (chatbot + subscriptions) */
+  .right-col { display:flex; flex-direction:column; gap:12px; }
+  .widget { background:var(--card); border-radius:12px; padding:12px; box-shadow: 0 6px 18px rgba(15,23,42,0.04) }
+
+  /* chatbot */
+  .chatbox { height:320px; overflow:auto; display:flex; flex-direction:column; gap:8px; padding:8px; border-radius:8px; background: linear-gradient(180deg,#fbfbff,#fff) }
+  .msg { max-width:78%; padding:8px 12px;border-radius:14px; display:inline-block }
+  .msg.bot { background:#f3f4f6; color:#111; align-self:flex-start; border-bottom-left-radius:4px; }
+  .msg.user { background: #dcfce7; color:#064e3b; align-self:flex-end; border-bottom-right-radius:4px; }
+  .chat-input { display:flex; gap:8px; margin-top:8px }
+  .chat-input input { flex:1; padding:10px;border-radius:10px;border:1px solid #e6edf3; }
+  .chat-input button { background:var(--accent); color:white;padding:10px 12px;border-radius:10px;border:none;cursor:pointer }
+
+  /* call modal and subscription modal */
+  .modal-backdrop { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background: rgba(2,6,23,0.45); z-index:40 }
+  .modal { width:400px; max-width:92%; background:white; border-radius:12px;padding:18px; box-shadow: 0 20px 60px rgba(2,6,23,0.4); animation:pop .18s ease; }
+  @keyframes pop { from{ transform: translateY(6px) scale(.98); opacity:0 } to{ transform:none; opacity:1 } }
+
+  /* subscriptions */
+  .plans { display:flex; gap:8px; }
+  .plan { flex:1; padding:12px; border-radius:12px; text-align:center; background:linear-gradient(180deg,#fff,#f8fafc); border:1px solid #eef2ff }
+  .plan h4{ margin:8px 0 }
+  .plan .price { font-size:1.2rem; color:var(--accent); font-weight:700 }
+
+  /* small screens */
+  @media (max-width:980px){
+    .grid { grid-template-columns: 1fr; }
+    .cards { grid-template-columns: 1fr; }
+    .app { padding:12px }
+    .sidebar { display:none }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar" aria-label="Navigation">
+    <div class="brand"><span class="logo"></span> PATHSHALA</div>
+    <nav>
+      <a href="#">🏠 Dashboard</a>
+      <a href="#">🔍 Find Tutors</a>
+      <a href="#">📅 Sessions</a>
+      <a href="#">💳 Subscriptions</a>
+      <a href="#">⚙ Settings</a>
+    </nav>
+    <div class="small">Public repo demo — front-end only</div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main" role="main">
+    <header>
+      <div class="welcome">Welcome back, <span id="userRoleLabel">Learner</span> 👋</div>
+      <div class="profile pill" id="profileBtn">
+        <img src="../assets/img/profile.jpg" alt="profile" onerror="this.src='https://via.placeholder.com/44'">
+        <div style="font-size:13px">John Doe</div>
+      </div>
+    </header>
+
+    <section class="grid">
+      <!-- Left column -->
+      <div>
+        <div class="cards">
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-size:14px;color:var(--muted)">Study Streak</div>
+                <div style="font-weight:700;font-size:20px">7 days 🔥</div>
+              </div>
+              <div style="text-align:right">
+                <div style="color:var(--muted);font-size:13px">Points</div>
+                <div style="font-weight:700">1,420</div>
+              </div>
+            </div>
+            <div style="margin-top:12px">
+              <div class="progress"><i id="streakBar"></i></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <div style="font-size:14px;color:var(--muted)">Today's Goal</div>
+                <div style="font-weight:700">Finish 2 practice sessions</div>
+              </div>
+              <button onclick="openCallModal(null)" style="background:linear-gradient(90deg,#34d399,#10b981);border:none;color:white;padding:8px 10px;border-radius:8px;cursor:pointer">Start Call</button>
+            </div>
+            <p style="margin-top:10px;color:var(--muted);font-size:14px">Use 1-on-1 calls to discuss doubts with your tutor.</p>
+          </div>
+
+          <div class="card full">
+            <h3 style="margin:0 0 10px 0">Recommended Tutors</h3>
+            <div style="display:flex;gap:12px; margin-bottom:12px; align-items:center;">
+              <div style="flex:1">
+                <input id="filterSubject" placeholder="Type a subject to filter (e.g. Math)" style="width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef8" />
+              </div>
+              <div>
+                <button onclick="filterTutors()" style="padding:10px 12px;border-radius:8px;border:none;background:#2563eb;color:white;cursor:pointer">Filter</button>
+              </div>
+            </div>
+
+            <div class="tutor-list" id="tutorList" aria-live="polite">
+              <!-- tutors injected here -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right column -->
+      <aside class="right-col">
+        <div class="widget">
+          <h4 style="margin:0 0 8px 0">AI Chatbot — Study Buddy</h4>
+          <div class="chatbox" id="chatbox">
+            <!-- messages -->
+          </div>
+          <div class="chat-input">
+            <input id="chatInput" placeholder="Ask the bot: 'I'm weak in X' or 'Recommend tutors'">
+            <button onclick="sendChat()">Send</button>
+          </div>
+        </div>
+
+        <div class="widget">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <h4 style="margin:0">Subscriptions</h4>
+            <div style="font-size:13px;color:var(--muted)">Manage plan</div>
+          </div>
+
+          <div class="plans" style="margin-top:12px">
+            <div class="plan">
+              <div style="font-size:13px;color:var(--muted)">Basic</div>
+              <div class="price">₹0 / mo</div>
+              <div style="margin-top:8px;font-size:13px;color:var(--muted)">Limited calls</div>
+              <button style="margin-top:12px;padding:8px 10px;border-radius:8px;border:none;background:#ef4444;color:white;cursor:pointer" onclick="buyPlan('Basic',0)">Choose</button>
+            </div>
+            <div class="plan" style="border:2px solid #e6f8ef">
+              <div style="font-size:13px;color:var(--muted)">Pro</div>
+              <div class="price">₹299 / mo</div>
+              <div style="margin-top:8px;font-size:13px;color:var(--muted)">5 calls / mo, priority matching</div>
+              <button style="margin-top:12px;padding:8px 10px;border-radius:8px;border:none;background:#059669;color:white;cursor:pointer" onclick="buyPlan('Pro',299)">Buy</button>
+            </div>
+            <div class="plan" style="border:2px solid #fef3c7">
+              <div style="font-size:13px;color:var(--muted)">Premium</div>
+              <div class="price">₹799 / mo</div>
+              <div style="margin-top:8px;font-size:13px;color:var(--muted)">Unlimited calls & AI coach</div>
+              <button style="margin-top:12px;padding:8px 10px;border-radius:8px;border:none;background:#b45309;color:white;cursor:pointer" onclick="buyPlan('Premium',799)">Buy</button>
+            </div>
+          </div>
+
+          <div id="subsStatus" style="margin-top:12px;font-size:13px;color:var(--muted)">Current Plan: <strong id="currentPlan">Free</strong></div>
+        </div>
+      </aside>
+    </section>
+  </main>
+</div>
+
+<!-- Modal placeholders -->
+<div id="modalRoot"></div>
+
+<!-- Inline JS: matching, chatbot and call simulation -->
+<script>
+  // Sample tutors (replace with real API data)
+  const tutors = [
+    { id:1, name:"Aisha Khan", subjects:["Math","Physics"], rating:4.8, price:400 },
+    { id:2, name:"Ravi Patel", subjects:["Computer Science","AI & ML"], rating:4.6, price:500 },
+    { id:3, name:"Neha Sharma", subjects:["English","History"], rating:4.4, price:300 },
+    { id:4, name:"Arjun Verma", subjects:["Data Science","Math"], rating:4.9, price:650 },
+    { id:5, name:"Priya Singh", subjects:["Web Development","App Development"], rating:4.7, price:450 }
+  ];
+
+  // Initialize UI
+  function renderTutors(list=tutors) {
+    const container = document.getElementById('tutorList');
+    container.innerHTML = '';
+    list.forEach(t=>{
+      const el = document.createElement('div'); el.className='tutor';
+      el.innerHTML = `
+        <img src="https://via.placeholder.com/52" style="width:52px;height:52px;border-radius:8px;object-fit:cover" alt="${t.name}">
+        <div class="meta">
+          <div class="name">${t.name} <span style="font-size:12px;color:var(--muted)"> · ₹${t.price}/hr</span></div>
+          <div class="sub">${t.subjects.join(', ')}</div>
+        </div>
+        <div style="text-align:right">
+          <div class="rating">⭐ ${t.rating}</div>
+          <div style="margin-top:8px">
+            <button style="padding:8px 10px;border-radius:8px;border:none;background:#2563eb;color:white;cursor:pointer" onclick="requestSession(${t.id})">Request</button>
+          </div>
+        </div>
+      `;
+      container.appendChild(el);
+    });
+  }
+  renderTutors();
+
+  // Filter tutors by subject
+  function filterTutors(){
+    const q = (document.getElementById('filterSubject').value || '').trim().toLowerCase();
+    if(!q){ renderTutors(); return; }
+    const filtered = tutors.filter(t => t.subjects.some(s => s.toLowerCase().includes(q)));
+    renderTutors(filtered.length?filtered:tutors.sort(()=>Math.random()-0.5)); // show random if none
+  }
+
+  // Request session (open modal)
+  function requestSession(tutorId){
+    const tutor = tutors.find(t=>t.id===tutorId);
+    openCallModal(tutor);
+  }
+
+  // Call modal (simulate connecting)
+  function openCallModal(tutor){
+    const root = document.getElementById('modalRoot');
+    root.innerHTML = `
+      <div class="modal-backdrop" id="callBackdrop">
+        <div class="modal">
+          <h3 style="margin-top:0">${tutor ? 'Request 1-on-1 Session' : 'Start Instant Call'}</h3>
+          <p style="color:var(--muted)">You are about to ${tutor? 'request a session with ' + tutor.name : 'start an instant call'}. This is a demo — no actual media connection.</p>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <button onclick="closeModal()" style="padding:8px 12px;border-radius:8px;border:1px solid #e6eef8;background:white;cursor:pointer">Cancel</button>
+            <button onclick="simulateCall(${tutor? tutor.id : 'null'})" style="padding:8px 12px;border-radius:8px;border:none;background:#10b981;color:white;cursor:pointer">Proceed</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+
+  function simulateCall(id){
+    const root = document.getElementById('modalRoot');
+    root.innerHTML = `
+      <div class="modal-backdrop">
+        <div class="modal" style="text-align:center">
+          <div style="font-size:36px">📞</div>
+          <h3 style="margin:8px 0">Connecting...</h3>
+          <div style="color:var(--muted)">Simulating a secure 1-on-1 call. (Demo)</div>
+          <div style="margin-top:16px"><button onclick="endCall()" style="padding:10px 14px;border-radius:8px;border:none;background:#ef4444;color:white;cursor:pointer">End Call</button></div>
+        </div>
+      </div>
+    `;
+    // auto "connected" message then close after some seconds
+    setTimeout(()=> {
+      const modal = document.querySelector('.modal');
+      if(modal) modal.querySelector('h3').innerText = 'Connected — 00:00';
+      // start fake timer
+      let seconds = 0;
+      const timer = setInterval(()=> {
+        seconds++;
+        if(!document.querySelector('.modal')) { clearInterval(timer); return; }
+        const m = Math.floor(seconds / 60).toString().padStart(2,'0');
+        const s = (seconds % 60).toString().padStart(2,'0');
+        const el = document.querySelector('.modal h3'); if(el) el.innerText = `Connected — ${m}:${s}`;
+        if(seconds>300){ clearInterval(timer); endCall(); }
+      },1000);
+    },800);
+  }
+
+  function endCall(){
+    closeModal();
+    alert('Call ended (demo).');
+  }
+
+  // Chatbot: simple rule-based flow and matching
+  const chatbox = document.getElementById('chatbox');
+  const botGreetings = "Hi! I'm PeerBot — tell me which subject(s) you feel weak in, or ask 'Recommend tutors'.";
+  addBotMsg(botGreetings);
+
+  function addBotMsg(text){ const d=document.createElement('div'); d.className='msg bot'; d.innerText=text; chatbox.appendChild(d); chatbox.scrollTop = chatbox.scrollHeight; }
+  function addUserMsg(text){ const d=document.createElement('div'); d.className='msg user'; d.innerText=text; chatbox.appendChild(d); chatbox.scrollTop = chatbox.scrollHeight; }
+
+  function sendChat(){
+    const input = document.getElementById('chatInput');
+    const txt = (input.value || '').trim();
+    if(!txt) return;
+    addUserMsg(txt);
+    input.value='';
+    setTimeout(()=> { handleBot(txt); }, 450);
+  }
+
+  function handleBot(msg){
+    const text = msg.toLowerCase();
+    if(text.includes('weak') || text.includes('i am weak') || text.includes('i m weak')){
+      addBotMsg("Okay — which subject do you feel weak in? (e.g. Math, Data Science, English)");
+      return;
+    }
+    if(text.includes('recommend') || text.includes('suggest')){
+      recommendByText(text);
+      return;
+    }
+    // check if contains known subject
+    const subjectMatch = tutors.flatMap(t=>t.subjects).find(s => text.includes(s.toLowerCase()) || text.includes(s.split(' ')[0].toLowerCase()));
+    if(subjectMatch){
+      addBotMsg(`Thanks — noted weakness in ${subjectMatch}. I recommend these tutors:`);
+      suggestTutorsFor(subjectMatch);
+      return;
+    }
+    // fallback with simple NLP-like reply
+    addBotMsg("I didn't fully get that. Try: 'I'm weak in Math' or 'Recommend tutors for Data Science'.");
+  }
+
+  function recommendByText(text){
+    // look for subject keywords
+    const keywords = ['math','data science','ai','ml','computer','web','english','history','physics'];
+    const found = keywords.find(k => text.includes(k));
+    if(found) return suggestTutorsFor(found);
+    addBotMsg("Tell me which subject you want tutors for (e.g. 'Recommend tutors for Math').");
+  }
+
+  function suggestTutorsFor(subject){
+    const s = subject.toLowerCase();
+    const matches = tutors.filter(t => t.subjects.some(sub => sub.toLowerCase().includes(s)));
+    if(matches.length===0){
+      addBotMsg("I couldn't find exact matches — showing top rated tutors instead.");
+      // sort by rating
+      const top = tutors.slice().sort((a,b)=>b.rating-a.rating).slice(0,3);
+      top.forEach(t => addBotMsg(`• ${t.name} — ${t.subjects.join(', ')} (⭐ ${t.rating})`));
+      addBotMsg("You can request a session by clicking 'Request' on a tutor card.");
+    } else {
+      matches.forEach(t => addBotMsg(`• ${t.name} — ${t.subjects.join(', ')} (⭐ ${t.rating}) — ₹${t.price}/hr`));
+      addBotMsg("Click 'Request' to send a session request.");
+    }
+  }
+
+  // Subscriptions
+  function buyPlan(name, price){
+    // show modal confirmation
+    const root = document.getElementById('modalRoot');
+    root.innerHTML = `
+      <div class="modal-backdrop">
+        <div class="modal">
+          <h3>Subscribe: ${name}</h3>
+          <p style="color:var(--muted)">You will be charged ₹${price} per month. (Demo — no real payment)</p>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+            <button onclick="closeModal()" style="padding:8px 12px;border-radius:8px;border:1px solid #e6eef8;background:white;cursor:pointer">Cancel</button>
+            <button onclick="confirmBuy('${name}', ${price})" style="padding:8px 12px;border-radius:8px;border:none;background:#059669;color:white;cursor:pointer">Confirm</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function confirmBuy(name, price){
+    closeModal();
+    // simulate success
+    document.getElementById('currentPlan').innerText = name + (price? ' (Paid)':' (Free)' );
+    alert('Subscription successful — ' + name);
+  }
+
+  // show user role label by query param
+  (function setUserRoleFromQuery(){
+    const params = new URLSearchParams(location.search);
+    const type = params.get('type');
+    if(type){
+      document.getElementById('userRoleLabel').innerText = type.charAt(0).toUpperCase() + type.slice(1);
+    }
+  })();
+
+  // initial animations
+  window.addEventListener('load', ()=>{
+    document.getElementById('streakBar').style.width = '70%';
+  });
+
+  // utility close modal used above
+  function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+
+  // attach Enter key to chat input
+  document.getElementById('chatInput').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); sendChat(); }
+  });
+</script>
+</body>
+</html>
+
